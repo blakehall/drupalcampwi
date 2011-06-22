@@ -1,1 +1,17 @@
 sites/default/settings.php
+.bash_history
+.usermin/
+awstats-icon
+awstatsicons
+git/
+icon
+stats/
+CHANGELOG.txt
+COPYRIGHT.txt
+INSTALL.mysql.txt
+INSTALL.pgsql.txt
+INSTALL.txt
+LICENSE.txt
+MAINTAINERS.txt
+README.txt
+UPGRADE.txt
