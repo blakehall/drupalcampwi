@@ -1,5 +1,9 @@
 <?php
-// $Id: fasttoggle.toggle.inc,v 1.1 2007/10/07 12:44:04 timcn Exp $
+
+/**
+ * @file
+ * Handles toggling of options.
+ */
 
 /**
  * Menu callback. Toggle options for a node if the action is confirmed via
@@ -10,7 +14,7 @@ function fasttoggle_node_option($node, $option) {
 
   // Check if the action is valid. This is essential to ensure the user has
   // access to the action.
-  if (isset($options[$option]) && isset($_GET['token']) && drupal_valid_token($_GET['token'], $option .'_'. $node->nid, true)) {
+  if (isset($options[$option]) && isset($_GET['token']) && drupal_valid_token($_GET['token'], $option .'_'. $node->nid, TRUE)) {
     // The action is confirmed: either via form submit or via AJAX/POST
     if (isset($_POST['confirm']) && $_POST['confirm']) {
       // Get the next ID.
@@ -21,6 +25,9 @@ function fasttoggle_node_option($node, $option) {
       $node->$option = key($options[$option]);
       node_save($node);
 
+      // Let other modules respond.
+      module_invoke_all('fasttoggle_toggle', 'node', $node, $option);
+
       // Output the new status for the updated link text on AJAX changes
       if (isset($_POST['javascript']) && $_POST['javascript']) {
         drupal_set_header('Content-Type: text/javascript; charset=utf-8');
@@ -29,6 +36,7 @@ function fasttoggle_node_option($node, $option) {
           'callback' => 'node',
           'option' => $option,
           'status' => $node->$option,
+          'className' => 'fasttoggle-status-node-'. $option .'-'. intval($node->$option),
         ));
         exit;
       }
@@ -40,7 +48,8 @@ function fasttoggle_node_option($node, $option) {
       // The action is not confirmed. The user came here through a regular link;
       // no AJAX was involved. That means, we need a confirmation form so that
       // we get a POST form.
-      return drupal_get_form('fasttoggle_node_option_confirm', $node, $options[$option][intval(!$node->$option)]);
+      $labels = _fasttoggle_get_label('node_'. $option, FASTTOGGLE_LABEL_STATUS);
+      return drupal_get_form('fasttoggle_node_option_confirm', $node, $labels[intval(!$node->$option)]);
     }
   }
   else {
@@ -71,16 +80,20 @@ function fasttoggle_user_option($user, $option) {
 
   // Check if the action is valid. This is essential to ensure the user has
   // access to the action.
-  if (isset($options[$option]) && isset($_GET['token']) && drupal_valid_token($_GET['token'], $option .'_'. $user->uid, true)) {
+  if (isset($options[$option]) && isset($_GET['token']) && drupal_valid_token($_GET['token'], $option .'_'. $user->uid, TRUE)) {
     if (isset($_POST['confirm']) && $_POST['confirm']) {
       $array = array($option => !$user->$option);
       $user = user_save($user, $array);
+
+      // Let other modules respond.
+      module_invoke_all('fasttoggle_toggle', 'user', $user, $option);
 
       // Output the new option for the updated link text on AJAX changes
       if (isset($_POST['javascript']) && $_POST['javascript']) {
         drupal_set_header('Content-Type: text/javascript; charset=utf-8');
         echo drupal_to_js(array(
           'text' => $options[$option][intval($user->$option)],
+          'className' => 'fasttoggle-status-user-'. $option .'-'. intval($user->$option),
         ));
         exit;
       }
@@ -92,7 +105,8 @@ function fasttoggle_user_option($user, $option) {
       // The action is not confirmed. The user came here through a regular link;
       // no AJAX was involved. That means, we need a confirmation form so that
       // we get a POST form.
-      return drupal_get_form('fasttoggle_user_option_confirm', $user, $options[$option][intval(!$user->$option)]);
+      $labels = _fasttoggle_get_label('user_'. $option, FASTTOGGLE_LABEL_STATUS);
+      return drupal_get_form('fasttoggle_user_option_confirm', $user, $labels[intval(!$user->$option)]);
     }
   }
   else {
@@ -123,11 +137,14 @@ function fasttoggle_comment_option($comment, $option) {
 
   // Check if the action is valid. This is essential to ensure the user has
   // access to the action.
-  if (isset($options[$option]) && isset($_GET['token']) && drupal_valid_token($_GET['token'], $option .'_'. $comment->cid, true)) {
+  if (isset($options[$option]) && isset($_GET['token']) && drupal_valid_token($_GET['token'], $option .'_'. $comment->cid, TRUE)) {
     // The action is confirmed: either via form submit or via AJAX/POST
     if (isset($_POST['confirm']) && $_POST['confirm']) {
       $comment->$option = !$comment->$option;
       comment_save((array)$comment);
+
+      // Let other modules respond.
+      module_invoke_all('fasttoggle_toggle', 'comment', $comment, $option);
 
       // Output the new status for the updated link text on AJAX changes
       if (isset($_POST['javascript']) && $_POST['javascript']) {
@@ -137,6 +154,7 @@ function fasttoggle_comment_option($comment, $option) {
           'callback' => 'comment',
           'option' => $option,
           'status' => $comment->$option,
+          'className' => 'fasttoggle-status-comment-'. $option .'-'. (1 - intval($comment->$option)),
         ));
         exit;
       }
@@ -148,7 +166,8 @@ function fasttoggle_comment_option($comment, $option) {
       // The action is not confirmed. The user came here through a regular link;
       // no AJAX was involved. That means, we need a confirmation form so that
       // we get a POST form.
-      return drupal_get_form('fasttoggle_comment_option_confirm', $comment, $options[$option][intval(!$comment->$option)]);
+      $labels = _fasttoggle_get_label('comment_'. $option, FASTTOGGLE_LABEL_STATUS);
+      return drupal_get_form('fasttoggle_comment_option_confirm', $comment, $labels[intval(!$comment->$option)]);
     }
   }
   else {

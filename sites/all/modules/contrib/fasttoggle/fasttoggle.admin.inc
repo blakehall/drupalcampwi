@@ -1,5 +1,9 @@
 <?php
-// $Id: fasttoggle.admin.inc,v 1.1.2.2 2008/03/24 15:12:14 timcn Exp $
+
+/**
+ * @file
+ * Contains the administration forms for fasttoggle.module.
+ */
 
 /**
  * (Menu callback) Configures what fast toggling options are available.

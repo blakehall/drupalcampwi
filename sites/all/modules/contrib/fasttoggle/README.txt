@@ -43,3 +43,21 @@ implementing hook_fasttoggle_labels().
 
 After you added your custom strings, make sure to select them on the
 configuration page.
+
+
+THEMING LINKS
+=============
+There is no dedicated theme function for altering the HTML code of fasttoggle
+links, however, the module applies classes to the <a> tag in the form
+"fasttoggle-status-<type>-<option>-<status>" with status being 0, 1 or 2.
+The status number always refers to the current state of the option (e.g. it's
+0 for an unpublished node's "publish" link). Make sure that the throbbing
+graphic is appropriately displayed when overriding the background image.
+
+
+PERMISSIONS
+===========
+It is possible to control what links are displayed in a very fine-grained way.
+Only users who have the ability to toggle a specific setting may update this
+setting. They can only change nodes they have admin access to. This means that
+fasttoggle.module plays nicely with node access modules as well.

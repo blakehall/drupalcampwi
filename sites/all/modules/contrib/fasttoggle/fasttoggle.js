@@ -1,6 +1,11 @@
-// $Id: fasttoggle.js,v 1.5 2007/10/07 12:27:53 timcn Exp $
 
 Drupal.fasttoggle = {
+  'className': function(data) {
+     $(this)
+       .attr('class', $(this).attr('class').replace(/\bfasttoggle-status-[^\s]+/, ''))
+       .addClass(data.className);
+  },
+
   'comment': function(data) {
     if (data.option == 'status') {
       $(this).parents('.comment')[data.status ? 'addClass' : 'removeClass']('comment-unpublished');
@@ -20,6 +25,7 @@ Drupal.fasttoggle = {
 };
 
 Drupal.behaviors.fasttoggle = function(context) {
+  // Unbind is used to prevent dblclick module from interfering.
   $('a.fasttoggle', context).unbind('click').click(function() {
     // Add the throbber
     var link = $(this).addClass('throbbing');
@@ -33,8 +39,13 @@ Drupal.behaviors.fasttoggle = function(context) {
       'dataType': 'json',
       'success': function(data) {
         // Remove the throbber
-        link.html(data.text).removeClass('throbbing');
-        
+        link.text(data.text).removeClass('throbbing');
+
+        // Change the class name of the link after toggling it.
+        if (data.className) {
+          Drupal.fasttoggle.className.call(link[0], data);
+        }
+
         // Call the callback function for altering the display of other elements
         if (data.callback && Drupal.fasttoggle[data.callback]) {
           Drupal.fasttoggle[data.callback].call(link[0], data);

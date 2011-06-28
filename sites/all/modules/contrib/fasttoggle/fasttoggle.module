@@ -1,9 +1,8 @@
 <?php
-// $Id: fasttoggle.module,v 1.8.2.4 2008/04/19 19:35:36 timcn Exp $
 
 /**
  * @file
- * Enables fast toggling of binary or not so binary settings
+ * Enables fast toggling of binary or not so binary settings.
  */
 
 /**
@@ -123,20 +122,23 @@ function fasttoggle_help($path, $arg) {
  *   (optional; defaults to an empty string) Provide a salt for the token
  *   authentification added to each toggle link. If the string is empty, the
  *   generic token for the user on this site is used.
+ * @param $class
+ *   (optional; defaults to an empty string) Add a class name to the link so
+ *   that it can be styled with CSS.
  *
  * @return
  *   Either a complete HTML link or a link array structure for use in hook_link.
  */
-function fasttoggle($title, $callback, $html = TRUE, $token = '') {
-  static $sent = false;
+function fasttoggle($title, $callback, $html = TRUE, $token = '', $class = '') {
+  static $sent = FALSE;
 
   // Only include the support files once.
   if (!$sent) {
-    $sent = true;
+    $sent = TRUE;
     drupal_add_js(drupal_get_path('module', 'fasttoggle') .'/fasttoggle.js');
     drupal_add_css(drupal_get_path('module', 'fasttoggle') .'/fasttoggle.css', 'module', 'all', FALSE);
   }
-  $attributes = array('class' => 'fasttoggle', 'title' => t('Toggle this setting'));
+  $attributes = array('class' => 'fasttoggle'. (!empty($class) ? ' '. $class : ''), 'title' => t('Toggle this setting'));
   $query = drupal_get_destination() .'&token='. drupal_get_token($token);
 
   if ($html) {
@@ -179,7 +181,6 @@ function fasttoggle_get_options($type) {
   return call_user_func_array('module_invoke_all', $args);
 }
 
-
 /**
  * Implementation of hook_fasttoggle_options().
  */
@@ -188,21 +189,21 @@ function fasttoggle_fasttoggle_options($type, $obj = NULL) {
 
   switch ($type) {
     case 'node': // $obj = node
-      $admin = user_access('administer nodes');
+      $allow = node_access('update', $obj);
 
       // Get an array with all enabled fast toggle links
       $settings = variable_get('fasttoggle_node_settings', array('status' => TRUE, 'sticky' => TRUE, 'promote' => TRUE, 'comment' => FALSE));
 
-      if ($settings['status'] && ($admin || user_access('moderate posts'))) {
+      if ($settings['status'] && $allow && user_access('moderate posts')) {
         $return['status'] = _fasttoggle_get_label('node_status');
       }
-      if ($settings['sticky'] && ($admin || user_access('make posts sticky'))) {
+      if ($settings['sticky'] && $allow && user_access('make posts sticky')) {
         $return['sticky'] = _fasttoggle_get_label('node_sticky');
       }
-      if ($settings['promote'] && ($admin || user_access('promote posts'))) {
+      if ($settings['promote'] && $allow && user_access('promote posts')) {
         $return['promote'] = _fasttoggle_get_label('node_promote');
       }
-      if (module_exists('comment') && $settings['comment'] && ($admin || user_access('administer comments'))) {
+      if (module_exists('comment') && $settings['comment'] && $allow && user_access('administer comments')) {
         $return['comment'] = _fasttoggle_get_label('comment_admin');
       }
       break;
@@ -227,36 +228,40 @@ function fasttoggle_fasttoggle_options($type, $obj = NULL) {
   return $return;
 }
 
-
 /**
  * Implementation of hook_form_alter().
  */
 function fasttoggle_form_alter(&$form, $form_state, $form_id) {
   switch ($form_id) {
-    case 'node_admin_nodes':
+    case 'node_admin_content':
       // Add published/unpublished toggle links to the node overview page.
-      if (isset($form['status'])) {
-        foreach ($form['status'] as $key => $status) {
-          $form['status'][$key]['#value'] = fasttoggle($status['#value'], 'node/'. $key .'/toggle/status', true, 'status_'. $key);
+      if (isset($form['admin']['status'])) {
+        $labels = _fasttoggle_get_label('node_status');
+
+        foreach ($form['admin']['status'] as $key => $status) {
+          $status = intval($status['#value'] == t('published'));
+          $form['admin']['status'][$key]['#value'] = fasttoggle($labels[$status], 'node/'. $key .'/toggle/status', TRUE, 'status_'. $key, 'fasttoggle-status-node-status-'. $status);
         }
       }
       break;
     case 'user_admin_account':
       // Add blocked/unblocked toggle links to the user overview page.
       if (isset($form['status'])) {
+        $labels = _fasttoggle_get_label('user_status');
+
         foreach ($form['status'] as $key => $status) {
-          $form['status'][$key]['#value'] = fasttoggle($status['#value'], 'admin/user/'. $key .'/toggle/status', true, 'status_'. $key);
+          $status = intval($status['#value'] == t('active'));
+          $form['status'][$key]['#value'] = fasttoggle($labels[$status], 'user/'. $key .'/toggle/status', TRUE, 'status_'. $key, 'fasttoggle-status-user-status-'. $status);
         }
       }
       break;
   }
 }
 
-
 /**
  * Implementation of hook_link().
  */
-function fasttoggle_link($type, $obj = null, $teaser = false) {
+function fasttoggle_link($type, $obj = NULL, $teaser = FALSE) {
   $links = array();
   $options = fasttoggle_get_options($type, $obj);
 
@@ -264,20 +269,20 @@ function fasttoggle_link($type, $obj = null, $teaser = false) {
     switch ($type) {
       case 'node':
         foreach (array_keys($options) as $key) {
-          $links['fasttoggle_'. $key] = fasttoggle($options[$key][intval($obj->$key)], 'node/'. $obj->nid .'/toggle/'. $key, false, $key .'_'. $obj->nid);
+          $links['fasttoggle_'. $key] = fasttoggle($options[$key][intval($obj->$key)], 'node/'. $obj->nid .'/toggle/'. $key, FALSE, $key .'_'. $obj->nid, 'fasttoggle-status-node-'. $key .'-'. intval($obj->$key));
         }
         break;
       case 'comment':
         fasttoggle_load_comment($obj);
         foreach (array_keys($options) as $key) {
-          $links['fasttoggle_'. $key] = fasttoggle($options[$key][intval($obj->$key)], 'comment/toggle/'. $obj->cid .'/'. $key, false, $key .'_'. $obj->cid);
+          $links['fasttoggle_'. $key] = fasttoggle($options[$key][intval($obj->$key)], 'comment/toggle/'. $obj->cid .'/'. $key, FALSE, $key .'_'. $obj->cid,  'fasttoggle-status-comment-'. $key .'-'. (1 - intval($obj->$key)));
         }
         break;
       // User is not one of the standard types for hook_link(). This
       // use enables adding of user links to a user profile.
       case 'user':
         foreach (array_keys($options) as $key) {
-          $links['fasttoggle_'. $key] = fasttoggle($options[$key][intval($obj->$key)], 'user/'. $obj->uid .'/toggle/'. $key, false, $key .'_'. $obj->uid);
+          $links['fasttoggle_'. $key] = fasttoggle($options[$key][intval($obj->$key)], 'user/'. $obj->uid .'/toggle/'. $key, FALSE, $key .'_'. $obj->uid, 'fasttoggle-status-user-'. $key .'-'. $obj->$key);
         }
         break;
     }
@@ -285,48 +290,6 @@ function fasttoggle_link($type, $obj = null, $teaser = false) {
 
   return $links;
 }
-
-
-/**
- * Implementation of hook_views_tables().
- */
-function fasttoggle_views_tables() {
-  $tables['fasttoggle'] = array(
-    'fields' => array(
-      'fasttoggle' => array(
-        'name' => t('Node: Fasttoggle'),
-        'handler' => 'fasttoggle_handler_field',
-        'query_handler' => 'fasttoggle_node_query_handler',
-        'sortable' => false,
-        'option' => array(
-          '#type' => 'select',
-          '#options' => array(
-            'status' => t('Status'),
-            'promote' => t('Promoted'),
-            'sticky' => t('Sticky'),
-            'comment' => t('Comment settings'),
-          ),
-        ),
-        'notafield' => 'true',
-        'help' => t('This field contains a fasttoggle link for the selected action for the current node.'),
-      ),
-    ),
-  );
-
-  return $tables;
-}
-
-/**
- * Views query callback.
- */
-function fasttoggle_node_query_handler($fielddata, $fieldinfo, &$query) {
-  foreach (array('status', 'comment', 'promote', 'sticky') as $field) {
-    if (!in_array('node.'. $field, $query->fields)) {
-      $query->fields[] = 'node.'. $field;
-    }
-  }
-}
-
 
 /**
  * Implementation of hook_fasttoggle_labels().
@@ -339,7 +302,7 @@ function fasttoggle_fasttoggle_labels($style) {
         'node_sticky' => array(0 => t('make sticky'), 1 => t('make unsticky')),
         'node_promote' => array(0 => t('promote'), 1 => t('demote')),
         'comment_admin' => array(0 => t('lock comments'), 1 => t('unlock comments'), 2 => t('hide comments')),
-        'user_status' => array(0 => t('activate'), 1 => t('unblock')),
+        'user_status' => array(0 => t('unblock'), 1 => t('block')),
         'comment_status' => array(0 => t('unpublish'), 1 => t('publish')),
       );
       break;
@@ -358,35 +321,31 @@ function fasttoggle_fasttoggle_labels($style) {
   return $labels;
 }
 
-
 /**
  * Returns an array with labels for a given setting.
  */
-function _fasttoggle_get_label($label) {
-  static $labels;
+function _fasttoggle_get_label($label, $style = NULL) {
+  static $labels = array();
 
-  if ($labels == NULL) {
+  if (!isset($style)) {
     $style = variable_get('fasttoggle_label_style', FASTTOGGLE_LABEL_STATUS);
-    $labels = module_invoke_all('fasttoggle_labels', $style);
+  }
+
+  if (!isset($lables[$style])) {
+    $lables[$style] = module_invoke_all('fasttoggle_labels', $style);
 
     // Allow custom labels in settings.php.
     if ($style == FASTTOGGLE_LABEL_CUSTOM) {
-      $labels = array_merge($labels, variable_get('fasttoggle_labels', array()));
+      $lables[$style] = array_merge($lables[$style], variable_get('fasttoggle_labels', array()));
     }
   }
 
-  return $labels[$label];
+  return $lables[$style][$label];
 }
 
-
-/**
- * Views handler callback.
- */
-function fasttoggle_handler_field($fieldinfo, $fielddata, $value, $data) {
-  $options = fasttoggle_get_options('node', $data);
-  $key = $fielddata['options'];
-
-  if (isset($options[$key]) && isset($data->$key)) {
-    return fasttoggle($options[$key][intval($data->$key)], 'node/'. $data->nid .'/toggle/'. $key, true, $key .'_'. $data->nid);
-  }
+function fasttoggle_views_api() {
+  return array(
+    'api' => 2,
+    'path' => drupal_get_path('module', 'fasttoggle') .'/views',
+  );
 }
